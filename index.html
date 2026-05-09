@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SMMC FSM">
+<meta name="theme-color" content="#0f2744">
+<title>SMMC FSM — Brigada Medidores</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --azul:#185FA5;--azul-dark:#0f2744;--azul-mid:#1a4a80;--azul-light:#e8f0fb;
+  --verde:#16a34a;--verde-light:#dcfce7;
+  --amarillo:#d97706;--amarillo-light:#fef3c7;
+  --rojo:#dc2626;--rojo-light:#fee2e2;
+  --naranja:#ea580c;--naranja-light:#ffedd5;
+  --gris:#6b7280;--gris-light:#f3f4f6;
+  --borde:#e2e8f0;--blanco:#fff;
+  --sombra:0 2px 8px rgba(0,0,0,.10);--sombra-lg:0 8px 24px rgba(0,0,0,.16);
+  --r:10px;--font:'Segoe UI',system-ui,-apple-system,sans-serif;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;width:100%;overflow:hidden;background:#f1f5f9;font-family:var(--font);}
+/* HEADER */
+#app-header{position:fixed;top:0;left:0;right:0;z-index:1000;background:var(--azul-dark);padding:10px 14px 0;}
+.header-top{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;}
+.header-top h1{font-size:.95rem;font-weight:700;color:#fff;display:flex;align-items:center;gap:6px;}
+.header-top h1 span.badge{font-size:.62rem;font-weight:700;background:var(--amarillo);color:#fff;padding:2px 7px;border-radius:20px;}
+.header-actions{display:flex;gap:8px;align-items:center;}
+.btn-icon{background:rgba(255,255,255,.12);border:none;border-radius:8px;color:#fff;padding:7px 10px;font-size:.78rem;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:var(--font);transition:background .2s;}
+.btn-icon:hover{background:rgba(255,255,255,.22);}
+.net-badge{font-size:.6rem;padding:2px 7px;border-radius:20px;font-weight:700;}
+.net-badge.online{background:var(--verde);color:#fff;}
+.net-badge.offline{background:var(--rojo);color:#fff;}
+/* TABS */
+.tab-bar{display:flex;border-top:1px solid rgba(255,255,255,.12);}
+.tab-btn{flex:1;background:none;border:none;color:rgba(255,255,255,.5);padding:8px 4px 10px;font-size:.68rem;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;border-bottom:3px solid transparent;transition:all .2s;font-family:var(--font);}
+.tab-btn.active{color:#fff;border-bottom-color:var(--amarillo);}
+/* MAIN */
+#main{position:fixed;top:95px;bottom:0;left:0;right:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.view{display:none;padding:12px 12px 80px;}
+.view.active{display:block;}
+#view-mapa{display:none;padding:0;position:relative;}
+#view-mapa.active{display:block;}
+/* FAB */
+#fab{position:fixed;bottom:calc(18px + var(--safe-bottom));right:16px;width:56px;height:56px;border-radius:50%;background:var(--azul);color:#fff;font-size:1.5rem;border:none;box-shadow:var(--sombra-lg);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:900;transition:transform .2s,background .2s;}
+#fab:hover{background:var(--azul-mid);transform:scale(1.06);}
+/* STATS */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.stat-card{background:#fff;border-radius:var(--r);padding:13px;box-shadow:var(--sombra);border-left:4px solid var(--azul);}
+.stat-card.verde{border-color:var(--verde);}
+.stat-card.rojo{border-color:var(--rojo);}
+.stat-card.amarillo{border-color:var(--amarillo);}
+.stat-card.naranja{border-color:var(--naranja);}
+.stat-card.gris{border-color:var(--gris);}
+.stat-label{font-size:.63rem;color:var(--gris);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:3px;}
+.stat-value{font-size:1.55rem;font-weight:800;color:var(--azul-dark);}
+.stat-sub{font-size:.66rem;color:var(--gris);margin-top:1px;}
+/* PROGRESO */
+.prog-wrap{background:#fff;border-radius:var(--r);padding:13px;box-shadow:var(--sombra);margin-bottom:12px;}
+.prog-head{font-size:.73rem;font-weight:700;color:var(--azul-dark);display:flex;justify-content:space-between;margin-bottom:7px;}
+.prog-track{height:10px;background:#e2e8f0;border-radius:99px;overflow:hidden;}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--azul),var(--verde));border-radius:99px;transition:width .6s ease;}
+/* CICLO TIEMPOS */
+.ciclo-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
+.ciclo-card{background:#fff;border-radius:var(--r);padding:11px;box-shadow:var(--sombra);text-align:center;}
+.ciclo-card .cv{font-size:1.2rem;font-weight:800;color:var(--azul-dark);}
+.ciclo-card .cl{font-size:.6rem;color:var(--gris);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+/* CHARTS */
+.chart-card{background:#fff;border-radius:var(--r);padding:13px;box-shadow:var(--sombra);margin-bottom:12px;}
+.chart-title{font-size:.7rem;font-weight:700;color:var(--azul-dark);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
+.chart-wrap{position:relative;height:170px;}
+/* FILTROS */
+.filtros{background:#fff;border-radius:var(--r);padding:11px;box-shadow:var(--sombra);margin-bottom:11px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.filtros select,.filtros input[type=date]{width:100%;border:1px solid var(--borde);border-radius:7px;padding:7px 9px;font-size:.78rem;font-family:var(--font);color:var(--azul-dark);background:#fff;}
+.filtros-full{grid-column:1/-1;}
+/* LISTA CARDS */
+.medidor-card{background:#fff;border-radius:var(--r);padding:13px;box-shadow:var(--sombra);margin-bottom:9px;border-left:4px solid var(--gris);cursor:pointer;transition:box-shadow .2s;position:relative;overflow:hidden;}
+.medidor-card:hover{box-shadow:var(--sombra-lg);}
+.medidor-card.completado{border-color:var(--verde);}
+.medidor-card.en-proceso{border-color:var(--amarillo);}
+.medidor-card.problema{border-color:var(--rojo);}
+.medidor-card.pendiente{border-color:var(--gris);}
+.mc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;}
+.mc-poste{font-weight:700;font-size:.92rem;color:var(--azul-dark);}
+.mc-estado{font-size:.63rem;font-weight:700;padding:3px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;}
+.estado-completado{background:var(--verde-light);color:var(--verde);}
+.estado-en-proceso{background:var(--amarillo-light);color:var(--amarillo);}
+.estado-problema{background:var(--rojo-light);color:var(--rojo);}
+.estado-pendiente{background:var(--gris-light);color:var(--gris);}
+.mc-dir{font-size:.76rem;color:var(--gris);margin-bottom:5px;}
+.mc-meta{display:flex;flex-wrap:wrap;gap:5px;}
+.mc-tag{font-size:.64rem;background:var(--azul-light);color:var(--azul);padding:2px 7px;border-radius:20px;font-weight:600;}
+.mc-tag.tc{background:#faf5ff;color:#7c3aed;}
+.mc-tag.ciclo{background:var(--verde-light);color:var(--verde);}
+.mc-foto{position:absolute;right:11px;bottom:11px;width:42px;height:42px;border-radius:7px;object-fit:cover;border:2px solid #fff;box-shadow:var(--sombra);}
+/* MAPA */
+#mapa{width:100%;height:calc(100vh - 95px);}
+.mapa-ctrl{position:absolute;top:10px;right:10px;z-index:1000;background:#fff;border-radius:var(--r);padding:10px;box-shadow:var(--sombra-lg);font-size:.7rem;min-width:128px;}
+.mapa-ctrl label{display:flex;align-items:center;gap:6px;cursor:pointer;padding:3px 0;color:var(--azul-dark);font-weight:500;}
+.mapa-ctrl input[type=checkbox]{accent-color:var(--azul);}
+.btn-sat{display:block;margin-top:7px;background:var(--azul-dark);color:#fff;border:none;border-radius:6px;padding:5px 8px;font-size:.68rem;cursor:pointer;width:100%;font-family:var(--font);text-align:center;}
+/* OVERLAY / MODAL */
+.overlay{display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);align-items:flex-end;}
+.overlay.open{display:flex;}
+.modal{background:#fff;width:100%;border-radius:16px 16px 0 0;padding:0 16px calc(20px + var(--safe-bottom));max-height:92vh;overflow-y:auto;}
+.modal-handle{width:40px;height:4px;background:#e2e8f0;border-radius:99px;margin:10px auto 12px;cursor:pointer;}
+.modal-title{font-size:.97rem;font-weight:700;color:var(--azul-dark);margin-bottom:13px;padding-bottom:10px;border-bottom:1px solid var(--borde);display:flex;align-items:center;gap:8px;}
+.form-row{margin-bottom:11px;}
+.form-row label{display:block;font-size:.68rem;font-weight:700;color:var(--azul-dark);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
+.form-row input,.form-row select,.form-row textarea{width:100%;border:1.5px solid var(--borde);border-radius:8px;padding:9px 11px;font-size:.86rem;font-family:var(--font);color:var(--azul-dark);background:#fff;transition:border-color .2s;}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none;border-color:var(--azul);}
+.form-row textarea{resize:vertical;min-height:58px;}
+.form-2col{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.form-section{font-size:.67rem;font-weight:700;color:var(--azul);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 8px;padding-top:10px;border-top:1px solid var(--borde);}
+/* Input con botón inline */
+.input-group{display:flex;gap:6px;}
+.input-group input{flex:1;}
+.btn-inline{background:var(--azul-light);color:var(--azul);border:1.5px solid var(--azul);border-radius:8px;padding:0 11px;font-size:.82rem;cursor:pointer;white-space:nowrap;font-family:var(--font);flex-shrink:0;font-weight:600;}
+.btn-inline:active{background:var(--azul);color:#fff;}
+/* FOTO */
+.foto-area{border:2px dashed var(--borde);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color .2s;position:relative;overflow:hidden;}
+.foto-area:hover{border-color:var(--azul);}
+.foto-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.foto-preview{width:100%;max-height:190px;object-fit:cover;border-radius:8px;display:none;margin-top:8px;}
+.foto-label{font-size:.78rem;color:var(--gris);pointer-events:none;}
+.foto-icon{font-size:2rem;margin-bottom:4px;}
+/* TIEMPOS */
+.tiempo-box{background:var(--azul-light);border-radius:8px;padding:9px 12px;font-size:.8rem;color:var(--azul-dark);font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+.tiempo-box small{font-size:.65rem;color:var(--gris);font-weight:400;}
+.geo-hint{font-size:.68rem;margin-top:4px;display:flex;align-items:center;gap:4px;}
+.geo-ok{color:var(--verde);}.geo-err{color:var(--rojo);}
+/* MODAL ACTIONS */
+.modal-actions{display:flex;gap:10px;margin-top:15px;padding-top:12px;border-top:1px solid var(--borde);}
+.btn-primary{flex:1;background:var(--azul);color:#fff;border:none;border-radius:8px;padding:12px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:var(--font);transition:background .2s;}
+.btn-primary:hover{background:var(--azul-mid);}
+.btn-primary.verde{background:var(--verde);}
+.btn-secondary{background:#fff;color:var(--azul-dark);border:1.5px solid var(--borde);border-radius:8px;padding:12px 16px;font-size:.88rem;cursor:pointer;font-family:var(--font);}
+.btn-danger{background:var(--rojo);color:#fff;border:none;border-radius:8px;padding:12px 16px;font-size:.85rem;cursor:pointer;font-family:var(--font);}
+/* TOAST */
+.toast{position:fixed;bottom:calc(72px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--azul-dark);color:#fff;padding:10px 18px;border-radius:22px;font-size:.78rem;font-weight:600;z-index:9999;transition:all .3s;white-space:nowrap;max-width:90vw;box-shadow:var(--sombra-lg);pointer-events:none;}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+/* EMPTY */
+.empty{text-align:center;padding:40px 20px;color:var(--gris);}
+.empty-icon{font-size:2.5rem;margin-bottom:8px;}
+.empty p{font-size:.83rem;}
+/* SCAN OVERLAY */
+#scan-overlay{display:none;position:fixed;inset:0;z-index:3000;background:#000;flex-direction:column;align-items:center;justify-content:center;}
+#scan-overlay.open{display:flex;}
+#scan-video{width:90%;max-width:400px;border-radius:12px;}
+.scan-guide{position:absolute;width:220px;height:220px;border:3px solid var(--amarillo);border-radius:14px;box-shadow:0 0 0 9999px rgba(0,0,0,.55);}
+#btn-scan-close{position:absolute;top:24px;right:20px;background:rgba(255,255,255,.2);border:none;border-radius:50%;width:42px;height:42px;color:#fff;font-size:1.1rem;cursor:pointer;font-size:1.3rem;}
+.scan-hint{color:#fff;font-size:.82rem;margin-top:20px;text-align:center;}
+/* DETALLE MODAL */
+.detalle-foto{width:100%;max-height:200px;object-fit:cover;border-radius:10px;margin-bottom:12px;}
+.detalle-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--borde);font-size:.82rem;}
+.detalle-row:last-child{border:none;}
+.dr-label{color:var(--gris);font-weight:600;font-size:.72rem;text-transform:uppercase;}
+.dr-val{color:var(--azul-dark);font-weight:600;text-align:right;max-width:60%;}
+.btn-estado-change{width:100%;margin-top:4px;padding:10px;border:none;border-radius:8px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:var(--font);}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="app-header">
+  <div class="header-top">
+    <h1>⚡ SMMC <span class="badge">FSM</span></h1>
+    <div class="header-actions">
+      <span id="net-badge" class="net-badge offline">Sin conexión</span>
+      <button class="btn-icon" onclick="openCargar()">📥 Ruta</button>
+      <button class="btn-icon" onclick="sincronizar()">↑ Sync</button>
+    </div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('resumen',this)">Resumen</button>
+    <button class="tab-btn" onclick="showTab('lista',this)">Lista</button>
+    <button class="tab-btn" onclick="showTab('mapa',this)">Mapa</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- ── RESUMEN ──────────────────────────────────────── -->
+  <div class="view active" id="view-resumen">
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value" id="s-total">—</div></div>
+      <div class="stat-card verde"><div class="stat-label">Completados</div><div class="stat-value" id="s-comp">—</div></div>
+      <div class="stat-card amarillo"><div class="stat-label">En proceso</div><div class="stat-value" id="s-proceso">—</div></div>
+      <div class="stat-card gris"><div class="stat-label">Pendientes</div><div class="stat-value" id="s-pend">—</div></div>
+      <div class="stat-card rojo"><div class="stat-label">Con problema</div><div class="stat-value" id="s-prob">—</div></div>
+      <div class="stat-card naranja"><div class="stat-label">Trifásicos</div><div class="stat-value" id="s-tri">—</div></div>
+    </div>
+
+    <div class="prog-wrap">
+      <div class="prog-head"><span>Progreso general</span><span id="s-pct">—</span></div>
+      <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+
+    <!-- ▶ FASE 1: Tiempo de ciclo -->
+    <div style="font-size:.68rem;font-weight:700;color:var(--azul);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">⏱ Tiempo de ciclo (instalaciones completadas)</div>
+    <div class="ciclo-grid">
+      <div class="ciclo-card"><div class="cv" id="ciclo-prom">—</div><div class="cl">Promedio</div></div>
+      <div class="ciclo-card"><div class="cv" id="ciclo-min">—</div><div class="cl">Mínimo</div></div>
+      <div class="ciclo-card"><div class="cv" id="ciclo-max">—</div><div class="cl">Máximo</div></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Por estado</div>
+      <div class="chart-wrap"><canvas id="chart-estado"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Por técnico / brigada</div>
+      <div class="chart-wrap"><canvas id="chart-tecnico"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Razones TC</div>
+      <div class="chart-wrap"><canvas id="chart-tc"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Tipo de medidor</div>
+      <div class="chart-wrap"><canvas id="chart-tipo"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── LISTA ───────────────────────────────────────── -->
+  <div class="view" id="view-lista">
+    <div class="filtros">
+      <select id="f-estado" onchange="renderLista()">
+        <option value="">Todos los estados</option>
+        <option value="Pendiente">Pendiente</option>
+        <option value="En proceso">En proceso</option>
+        <option value="Completado">Completado</option>
+        <option value="Problema">Problema</option>
+      </select>
+      <select id="f-tipo" onchange="renderLista()">
+        <option value="">3F y 1F</option>
+        <option value="Trifásico">Trifásico (3F)</option>
+        <option value="Monofásico">Monofásico (1F)</option>
+      </select>
+      <select id="f-tecnico" onchange="renderLista()">
+        <option value="">Todos los técnicos</option>
+      </select>
+      <select id="f-foto" onchange="renderLista()">
+        <option value="">Con y sin foto</option>
+        <option value="con">Con foto</option>
+        <option value="sin">Sin foto</option>
+      </select>
+      <div class="filtros-full" style="display:flex;gap:6px;align-items:center;">
+        <input type="date" id="f-desde" onchange="renderLista()">
+        <span style="font-size:.7rem;color:var(--gris);">al</span>
+        <input type="date" id="f-hasta" onchange="renderLista()">
+        <button style="background:none;border:none;cursor:pointer;color:var(--gris);font-size:.78rem;" onclick="limpiarFiltros()">✕ Limpiar</button>
+      </div>
+    </div>
+    <div id="lista-container">
+      <div class="empty"><div class="empty-icon">📋</div><p>Sin registros.<br>Carga una ruta o añade un medidor.</p></div>
+    </div>
+  </div>
+
+  <!-- ── MAPA ────────────────────────────────────────── -->
+  <div class="view" id="view-mapa">
+    <div id="mapa"></div>
+    <div class="mapa-ctrl">
+      <label><input type="checkbox" id="cap-3f" checked onchange="actualizarMapa()"> Trifásico</label>
+      <label><input type="checkbox" id="cap-1f" checked onchange="actualizarMapa()"> Monofásico</label>
+      <hr style="border-color:var(--borde);margin:6px 0;">
+      <label><input type="checkbox" id="cap-comp" checked onchange="actualizarMapa()"> Completado</label>
+      <label><input type="checkbox" id="cap-proc" checked onchange="actualizarMapa()"> En proceso</label>
+      <label><input type="checkbox" id="cap-pend" checked onchange="actualizarMapa()"> Pendiente</label>
+      <label><input type="checkbox" id="cap-prob" checked onchange="actualizarMapa()"> Problema</label>
+      <button class="btn-sat" onclick="toggleSatelite()">🛰 Satélite</button>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- FAB -->
+<button id="fab" onclick="openRegistrar()">+</button>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     MODAL: REGISTRAR MEDIDOR (FASE 1 COMPLETO)
+═══════════════════════════════════════════════════════════ -->
+<div class="overlay" id="overlay-reg">
+  <div class="modal" id="modal-reg">
+    <div class="modal-handle" onclick="closeRegistrar()"></div>
+    <div class="modal-title">
+      <span id="modal-reg-icon">➕</span>
+      <span id="modal-reg-title">Registrar medidor</span>
+    </div>
+
+    <!-- Datos básicos -->
+    <div class="form-row">
+      <label>Subestación</label>
+      <input type="text" id="r-subestacion" placeholder="Ej: SE_Río Bueno">
+    </div>
+    <div class="form-2col">
+      <div class="form-row">
+        <label>N° Poste</label>
+        <input type="text" id="r-poste" placeholder="Ej: P3421">
+      </div>
+      <div class="form-row">
+        <label>Técnico</label>
+        <input type="text" id="r-tecnico" placeholder="Nombre">
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Dirección</label>
+      <input type="text" id="r-direccion" placeholder="Calle, número, sector">
+    </div>
+
+    <!-- ▶ FASE 1: N° Serie con escaneo QR/código de barras -->
+    <div class="form-section">📟 Identificación del medidor</div>
+    <div class="form-row">
+      <label>N° de serie del medidor</label>
+      <div class="input-group">
+        <input type="text" id="r-serie" placeholder="Escanear o ingresar manualmente">
+        <button class="btn-inline" onclick="openScanner()">📷 Scan</button>
+      </div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row">
+        <label>Tipo medidor</label>
+        <select id="r-tipo">
+          <option value="">Seleccionar</option>
+          <option value="Monofásico">Monofásico (1F)</option>
+          <option value="Trifásico">Trifásico (3F)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Tipo TC</label>
+        <select id="r-tc">
+          <option value="">Sin TC</option>
+          <option value="TC_75/5">TC 75/5</option>
+          <option value="TC_100/5">TC 100/5</option>
+          <option value="TC_150/5">TC 150/5</option>
+          <option value="TC_200/5">TC 200/5</option>
+          <option value="TC_Otro">TC Otro</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row" id="row-razon-tc" style="display:none">
+      <label>Razón TC</label>
+      <input type="text" id="r-razon-tc" placeholder="Ej: 100/5">
+    </div>
+
+    <!-- ▶ FASE 1: Geolocalización automática -->
+    <div class="form-section">📍 Ubicación</div>
+    <div class="form-row">
+      <label>Coordenadas GPS</label>
+      <div class="input-group">
+        <input type="text" id="r-coords" placeholder="Capturando ubicación..." readonly>
+        <button class="btn-inline" onclick="capturarGeo()">📡 GPS</button>
+      </div>
+      <div id="geo-status" class="geo-hint"></div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row">
+        <label>Latitud (manual)</label>
+        <input type="number" id="r-lat" step="any" placeholder="-40.xxxxx">
+      </div>
+      <div class="form-row">
+        <label>Longitud (manual)</label>
+        <input type="number" id="r-lon" step="any" placeholder="-72.xxxxx">
+      </div>
+    </div>
+
+    <!-- ▶ FASE 1: Tiempos de ciclo -->
+    <div class="form-section">⏱ Tiempo de trabajo</div>
+    <div class="form-row">
+      <label>Hora de inicio</label>
+      <div class="tiempo-box" id="display-inicio">— <small>Auto-capturada al abrir</small></div>
+      <input type="hidden" id="r-hora-inicio">
+    </div>
+    <div class="form-row">
+      <label>Hora de término</label>
+      <div class="input-group">
+        <input type="time" id="r-hora-fin" style="flex:1;">
+        <button class="btn-inline" onclick="capturarAhora()">Ahora</button>
+      </div>
+    </div>
+    <div class="form-row" id="ciclo-calc" style="display:none">
+      <div class="tiempo-box">
+        ⏱ Tiempo de ciclo: <strong id="ciclo-val">—</strong>
+        <small>min</small>
+      </div>
+    </div>
+
+    <!-- ▶ FASE 1: Fotografía -->
+    <div class="form-section">📸 Fotografía</div>
+    <div class="form-row">
+      <label>Foto del medidor instalado</label>
+      <div class="foto-area" id="foto-area">
+        <input type="file" id="r-foto" accept="image/*" capture="environment" onchange="onFotoChange(this)">
+        <div class="foto-icon">📷</div>
+        <div class="foto-label">Toca para fotografiar o seleccionar imagen</div>
+        <img class="foto-preview" id="foto-preview" alt="Vista previa">
+      </div>
+      <button style="margin-top:6px;width:100%;background:none;border:1.5px solid var(--borde);border-radius:8px;padding:8px;font-size:.78rem;color:var(--gris);cursor:pointer;font-family:var(--font);" onclick="clearFoto()">✕ Quitar foto</button>
+    </div>
+
+    <!-- Estado y fecha -->
+    <div class="form-section">📋 Estado y observaciones</div>
+    <div class="form-2col">
+      <div class="form-row">
+        <label>Estado</label>
+        <select id="r-estado">
+          <option value="Pendiente">Pendiente</option>
+          <option value="En proceso">En proceso</option>
+          <option value="Completado">Completado</option>
+          <option value="Problema">Problema</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Fecha instalación</label>
+        <input type="date" id="r-fecha">
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Comentario</label>
+      <textarea id="r-comentario" placeholder="Observaciones, dificultades, materiales usados..."></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeRegistrar()">Cancelar</button>
+      <button class="btn-primary" id="btn-guardar" onclick="guardarMedidor()">Guardar</button>
+    </div>
+    <div style="margin-top:8px;">
+      <button id="btn-eliminar" class="btn-danger" style="width:100%;display:none;" onclick="eliminarMedidor()">🗑 Eliminar registro</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     MODAL: CARGAR RUTA
+═══════════════════════════════════════════════════════════ -->
+<div class="overlay" id="overlay-cargar">
+  <div class="modal">
+    <div class="modal-handle" onclick="closeCargar()"></div>
+    <div class="modal-title">📥 Cargar ruta</div>
+    <p style="font-size:.78rem;color:var(--gris);margin-bottom:10px;">
+      Columnas del Excel/CSV:<br>
+      <code style="font-size:.7rem;background:#f3f4f6;padding:4px 7px;border-radius:5px;display:inline-block;margin-top:4px;">
+        n_subestacion · n_poste · direccion · Coordenada_X · Coordenada_Y · tecnico
+        · estado · tipo_medidor · tipo_tc · razon_tc · fecha_instalacion · comentario · n_medidor
+      </code>
+    </p>
+    <div class="foto-area" style="margin-bottom:12px;">
+      <input type="file" id="input-excel" accept=".xlsx,.xls,.csv" onchange="cargarRuta(this)">
+      <div class="foto-icon">📄</div>
+      <div class="foto-label">Seleccionar archivo Excel / CSV</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeCargar()">Cancelar</button>
+      <button class="btn-danger" onclick="borrarTodo()">🗑 Borrar todos los datos</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCAN OVERLAY (QR / Barcode)
+═══════════════════════════════════════════════════════════ -->
+<div id="scan-overlay">
+  <video id="scan-video" autoplay playsinline muted></video>
+  <div class="scan-guide"></div>
+  <div class="scan-hint">Apunta al código de barras o QR del medidor</div>
+  <button id="btn-scan-close" onclick="closeScanner()">✕</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ═══════════════════════════════════════════════════════════
+let medidores = [];
+let editId = null;
+let mapInstance = null;
+let isSatelite = false;
+let tileLayer = null;
+let markers = [];
+let chartEstado = null, chartTecnico = null, chartTc = null, chartTipo = null;
+let scanStream = null;
+let scanIntervalId = null;
+let fotoBase64 = null;
+
+const DB_NAME = 'smmc_fsm_db';
+const DB_VER  = 2;
+const STORE    = 'medidores';
+
+// ═══════════════════════════════════════════════════════════
+// INDEXEDDB
+// ═══════════════════════════════════════════════════════════
+function openDB(){
+  return new Promise((res,rej)=>{
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e=>{
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains(STORE))
+        db.createObjectStore(STORE,{keyPath:'id',autoIncrement:true});
+    };
+    req.onsuccess = e=>res(e.target.result);
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+async function dbGetAll(){
+  const db = await openDB();
+  return new Promise((res,rej)=>{
+    const tx = db.transaction(STORE,'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = e=>res(e.target.result);
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+async function dbPut(obj){
+  const db = await openDB();
+  return new Promise((res,rej)=>{
+    const tx = db.transaction(STORE,'readwrite');
+    const req = tx.objectStore(STORE).put(obj);
+    req.onsuccess = e=>res(e.target.result);
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+async function dbDelete(id){
+  const db = await openDB();
+  return new Promise((res,rej)=>{
+    const tx = db.transaction(STORE,'readwrite');
+    const req = tx.objectStore(STORE).delete(id);
+    req.onsuccess = e=>res(e.target.result);
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+async function dbClear(){
+  const db = await openDB();
+  return new Promise((res,rej)=>{
+    const tx = db.transaction(STORE,'readwrite');
+    const req = tx.objectStore(STORE).clear();
+    req.onsuccess = e=>res(e.target.result);
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+async function init(){
+  medidores = await dbGetAll();
+  actualizarUI();
+  checkOnline();
+  window.addEventListener('online',  ()=>checkOnline());
+  window.addEventListener('offline', ()=>checkOnline());
+}
+
+function checkOnline(){
+  const b = document.getElementById('net-badge');
+  if(navigator.onLine){ b.textContent='En línea'; b.className='net-badge online'; }
+  else                { b.textContent='Sin conexión'; b.className='net-badge offline'; }
+}
+
+// ═══════════════════════════════════════════════════════════
+// UI UPDATE MASTER
+// ═══════════════════════════════════════════════════════════
+function actualizarUI(){
+  renderStats();
+  renderCharts();
+  renderLista();
+  renderTecnicoFilter();
+  if(mapInstance) actualizarMapa();
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════════════════════════
+function renderStats(){
+  const t   = medidores.length;
+  const comp= medidores.filter(m=>m.estado==='Completado').length;
+  const proc= medidores.filter(m=>m.estado==='En proceso').length;
+  const pend= medidores.filter(m=>m.estado==='Pendiente').length;
+  const prob= medidores.filter(m=>m.estado==='Problema').length;
+  const tri = medidores.filter(m=>m.tipo_medidor==='Trifásico').length;
+  const pct  = t>0 ? Math.round((comp/t)*100) : 0;
+
+  document.getElementById('s-total').textContent   = t;
+  document.getElementById('s-comp').textContent    = comp;
+  document.getElementById('s-proceso').textContent = proc;
+  document.getElementById('s-pend').textContent    = pend;
+  document.getElementById('s-prob').textContent    = prob;
+  document.getElementById('s-tri').textContent     = tri;
+  document.getElementById('s-pct').textContent     = t>0 ? pct+'%' : '—';
+  document.getElementById('prog-fill').style.width = pct+'%';
+
+  // ▶ FASE 1: Tiempos de ciclo
+  const ciclos = medidores
+    .filter(m=>m.estado==='Completado' && m.hora_inicio && m.hora_fin)
+    .map(m=>calcCicloMin(m.hora_inicio, m.hora_fin))
+    .filter(v=>v!==null && v>0 && v<600);
+
+  if(ciclos.length>0){
+    const avg = Math.round(ciclos.reduce((a,b)=>a+b,0)/ciclos.length);
+    const mn  = Math.min(...ciclos);
+    const mx  = Math.max(...ciclos);
+    document.getElementById('ciclo-prom').textContent = fmtMin(avg);
+    document.getElementById('ciclo-min').textContent  = fmtMin(mn);
+    document.getElementById('ciclo-max').textContent  = fmtMin(mx);
+  } else {
+    ['ciclo-prom','ciclo-min','ciclo-max'].forEach(id=>document.getElementById(id).textContent='—');
+  }
+}
+
+function fmtMin(m){
+  if(m>=60) return Math.floor(m/60)+'h'+String(m%60).padStart(2,'0')+'m';
+  return m+'m';
+}
+
+function calcCicloMin(inicio, fin){
+  try{
+    const [h1,m1] = inicio.split(':').map(Number);
+    const [h2,m2] = fin.split(':').map(Number);
+    let diff = (h2*60+m2) - (h1*60+m1);
+    if(diff<0) diff+=1440;
+    return diff;
+  }catch{ return null; }
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════════════
+const COLORS_ESTADO = {
+  'Completado':'#16a34a','En proceso':'#d97706','Pendiente':'#9ca3af','Problema':'#dc2626'
+};
+
+function renderCharts(){
+  renderChartEstado();
+  renderChartTecnico();
+  renderChartTc();
+  renderChartTipo();
+}
+
+function mkChart(id, cfg, chartRef){
+  const ctx = document.getElementById(id).getContext('2d');
+  if(chartRef) chartRef.destroy();
+  return new Chart(ctx, cfg);
+}
+
+function renderChartEstado(){
+  const data = {
+    'Completado': medidores.filter(m=>m.estado==='Completado').length,
+    'En proceso': medidores.filter(m=>m.estado==='En proceso').length,
+    'Pendiente':  medidores.filter(m=>m.estado==='Pendiente').length,
+    'Problema':   medidores.filter(m=>m.estado==='Problema').length
+  };
+  chartEstado = mkChart('chart-estado', {
+    type:'doughnut',
+    data:{
+      labels: Object.keys(data),
+      datasets:[{data: Object.values(data), backgroundColor: Object.keys(data).map(k=>COLORS_ESTADO[k]),
+        borderWidth:0, hoverOffset:6}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12}}}}
+  }, chartEstado);
+}
+
+function renderChartTecnico(){
+  const tecMap = {};
+  medidores.forEach(m=>{
+    if(!m.tecnico) return;
+    if(!tecMap[m.tecnico]) tecMap[m.tecnico]={comp:0,proc:0,pend:0,prob:0};
+    if(m.estado==='Completado')  tecMap[m.tecnico].comp++;
+    else if(m.estado==='En proceso') tecMap[m.tecnico].proc++;
+    else if(m.estado==='Problema')   tecMap[m.tecnico].prob++;
+    else                             tecMap[m.tecnico].pend++;
+  });
+  const labels = Object.keys(tecMap);
+  chartTecnico = mkChart('chart-tecnico',{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Completado',data:labels.map(l=>tecMap[l].comp),backgroundColor:'#16a34a',borderRadius:4},
+        {label:'En proceso',data:labels.map(l=>tecMap[l].proc),backgroundColor:'#d97706',borderRadius:4},
+        {label:'Problema',data:labels.map(l=>tecMap[l].prob),backgroundColor:'#dc2626',borderRadius:4},
+        {label:'Pendiente',data:labels.map(l=>tecMap[l].pend),backgroundColor:'#e2e8f0',borderRadius:4},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:10}}},
+      scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,ticks:{font:{size:10},precision:0}}}}
+  }, chartTecnico);
+}
+
+function renderChartTc(){
+  const tcMap = {};
+  medidores.filter(m=>m.tipo_tc&&m.tipo_tc!=='Sin TC'&&m.tipo_tc!=='').forEach(m=>{
+    const k = m.razon_tc || m.tipo_tc;
+    tcMap[k] = (tcMap[k]||0)+1;
+  });
+  if(!Object.keys(tcMap).length){
+    const ctx = document.getElementById('chart-tc').getContext('2d');
+    if(chartTc) chartTc.destroy();
+    ctx.clearRect(0,0,400,200);
+    ctx.fillStyle='#9ca3af';ctx.font='13px sans-serif';ctx.textAlign='center';
+    ctx.fillText('Sin datos TC', 200, 90);
+    return;
+  }
+  chartTc = mkChart('chart-tc',{
+    type:'bar',
+    data:{
+      labels:Object.keys(tcMap),
+      datasets:[{label:'Cantidad',data:Object.values(tcMap),backgroundColor:'#7c3aed',borderRadius:4}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{font:{size:10}}},y:{ticks:{font:{size:10},precision:0}}}}
+  }, chartTc);
+}
+
+function renderChartTipo(){
+  const mono = medidores.filter(m=>m.tipo_medidor==='Monofásico').length;
+  const tri  = medidores.filter(m=>m.tipo_medidor==='Trifásico').length;
+  chartTipo = mkChart('chart-tipo',{
+    type:'pie',
+    data:{
+      labels:['Monofásico','Trifásico'],
+      datasets:[{data:[mono,tri],backgroundColor:['#185FA5','#d97706'],borderWidth:0,hoverOffset:6}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12}}}}
+  }, chartTipo);
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER LISTA
+// ═══════════════════════════════════════════════════════════
+function renderTecnicoFilter(){
+  const sel = document.getElementById('f-tecnico');
+  const val = sel.value;
+  const tecs = [...new Set(medidores.map(m=>m.tecnico).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos los técnicos</option>' +
+    tecs.map(t=>`<option value="${t}" ${t===val?'selected':''}>${t}</option>`).join('');
+}
+
+function renderLista(){
+  const fEstado  = document.getElementById('f-estado').value;
+  const fTipo    = document.getElementById('f-tipo').value;
+  const fTecnico = document.getElementById('f-tecnico').value;
+  const fFoto    = document.getElementById('f-foto').value;
+  const fDesde   = document.getElementById('f-desde').value;
+  const fHasta   = document.getElementById('f-hasta').value;
+
+  let lista = medidores.filter(m=>{
+    if(fEstado  && m.estado      !== fEstado)  return false;
+    if(fTipo    && m.tipo_medidor!== fTipo)    return false;
+    if(fTecnico && m.tecnico     !== fTecnico) return false;
+    if(fFoto==='con' && !m.foto) return false;
+    if(fFoto==='sin' && m.foto)  return false;
+    if(fDesde && m.fecha_instalacion < fDesde) return false;
+    if(fHasta && m.fecha_instalacion > fHasta) return false;
+    return true;
+  });
+
+  const cont = document.getElementById('lista-container');
+  if(!lista.length){
+    cont.innerHTML=`<div class="empty"><div class="empty-icon">🔍</div><p>Sin resultados con los filtros aplicados.</p></div>`;
+    return;
+  }
+  cont.innerHTML = lista.map(m=>{
+    const est = (m.estado||'Pendiente').toLowerCase().replace(' ','-');
+    const ciclo = (m.hora_inicio && m.hora_fin) ? calcCicloMin(m.hora_inicio,m.hora_fin) : null;
+    return `<div class="medidor-card ${est}" onclick="editarMedidor(${m.id})">
+      <div class="mc-top">
+        <div class="mc-poste">📍 ${m.n_poste||'Sin poste'}</div>
+        <div class="mc-estado estado-${est}">${m.estado||'Pendiente'}</div>
+      </div>
+      <div class="mc-dir">${m.direccion||'—'}</div>
+      <div class="mc-meta">
+        ${m.tecnico?`<span class="mc-tag">👷 ${m.tecnico}</span>`:''}
+        ${m.tipo_medidor?`<span class="mc-tag">${m.tipo_medidor}</span>`:''}
+        ${m.n_subestacion?`<span class="mc-tag">SE: ${m.n_subestacion}</span>`:''}
+        ${m.tipo_tc&&m.tipo_tc!=='Sin TC'?`<span class="mc-tag tc">TC</span>`:''}
+        ${m.foto?`<span class="mc-tag" style="background:#fef3c7;color:#92400e;">📷 Foto</span>`:''}
+        ${ciclo!==null&&ciclo>0&&ciclo<600?`<span class="mc-tag ciclo">⏱ ${fmtMin(ciclo)}</span>`:''}
+      </div>
+      ${m.foto?`<img class="mc-foto" src="${m.foto}" alt="foto">`:''}
+    </div>`;
+  }).join('');
+}
+
+function limpiarFiltros(){
+  ['f-estado','f-tipo','f-tecnico','f-foto'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-desde').value='';
+  document.getElementById('f-hasta').value='';
+  renderLista();
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAPA
+// ═══════════════════════════════════════════════════════════
+const COLOR_MAPA = {
+  'Completado':'#16a34a','En proceso':'#d97706','Pendiente':'#9ca3af','Problema':'#dc2626'
+};
+const ICON_MAPA = {
+  'Completado':'✅','En proceso':'🔄','Pendiente':'📌','Problema':'⚠️'
+};
+
+function initMapa(){
+  if(mapInstance) return;
+  mapInstance = L.map('mapa').setView([-40.32,-72.43],11);
+  tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap'
+  }).addTo(mapInstance);
+  actualizarMapa();
+}
+
+function actualizarMapa(){
+  if(!mapInstance) return;
+  markers.forEach(m=>m.remove());
+  markers=[];
+
+  const cap3f   = document.getElementById('cap-3f').checked;
+  const cap1f   = document.getElementById('cap-1f').checked;
+  const capComp = document.getElementById('cap-comp').checked;
+  const capProc = document.getElementById('cap-proc').checked;
+  const capPend = document.getElementById('cap-pend').checked;
+  const capProb = document.getElementById('cap-prob').checked;
+
+  const estadoVis = { 'Completado':capComp,'En proceso':capProc,'Pendiente':capPend,'Problema':capProb };
+
+  medidores.forEach(m=>{
+    const lat = parseFloat(m.latitud || m.Coordenada_Y);
+    const lon = parseFloat(m.longitud || m.Coordenada_X);
+    if(isNaN(lat)||isNaN(lon)) return;
+
+    if(m.tipo_medidor==='Trifásico' && !cap3f) return;
+    if(m.tipo_medidor==='Monofásico' && !cap1f) return;
+    const est = m.estado||'Pendiente';
+    if(!estadoVis[est]) return;
+
+    const color = COLOR_MAPA[est]||'#9ca3af';
+    const icon  = L.divIcon({
+      className:'',
+      html:`<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+      iconSize:[14,14],iconAnchor:[7,7]
+    });
+    const mk = L.marker([lat,lon],{icon}).addTo(mapInstance);
+    mk.bindPopup(`<div class="popup-detail">
+      <strong>${ICON_MAPA[est]||''} ${m.n_poste||'Poste ?'}</strong>
+      <p>${m.direccion||''}</p>
+      <p>Técnico: ${m.tecnico||'—'}</p>
+      <p>Tipo: ${m.tipo_medidor||'—'}</p>
+      ${m.foto?`<img class="popup-foto" src="${m.foto}">`:''}
+    </div>`);
+    markers.push(mk);
+  });
+}
+
+let satLayer = null;
+function toggleSatelite(){
+  if(!isSatelite){
+    if(tileLayer) tileLayer.remove();
+    satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+      attribution:'Tiles © Esri'
+    }).addTo(mapInstance);
+    isSatelite=true;
+  } else {
+    if(satLayer) satLayer.remove();
+    tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(mapInstance);
+    isSatelite=false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════
+function showTab(id, btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='mapa'){ setTimeout(()=>{ initMapa(); actualizarMapa(); },100); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODAL REGISTRAR
+// ═══════════════════════════════════════════════════════════
+function openRegistrar(){
+  editId = null;
+  fotoBase64 = null;
+  document.getElementById('modal-reg-title').textContent = 'Registrar medidor';
+  document.getElementById('modal-reg-icon').textContent  = '➕';
+  document.getElementById('btn-eliminar').style.display  = 'none';
+  document.getElementById('btn-guardar').textContent     = 'Guardar';
+
+  // Limpiar formulario
+  ['r-subestacion','r-poste','r-tecnico','r-direccion','r-serie','r-comentario','r-razon-tc','r-lat','r-lon'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+  document.getElementById('r-tipo').value  = '';
+  document.getElementById('r-tc').value    = '';
+  document.getElementById('r-estado').value= 'Pendiente';
+  document.getElementById('r-fecha').value = new Date().toISOString().split('T')[0];
+
+  // ▶ FASE 1: Captura hora inicio automática
+  const ahora = horaActual();
+  document.getElementById('r-hora-inicio').value   = ahora;
+  document.getElementById('display-inicio').innerHTML = `${ahora} <small>Auto-capturada al abrir</small>`;
+  document.getElementById('r-hora-fin').value      = '';
+  document.getElementById('ciclo-calc').style.display='none';
+
+  // Reset foto
+  document.getElementById('foto-preview').style.display='none';
+  document.getElementById('foto-preview').src='';
+  document.getElementById('r-foto').value='';
+
+  // ▶ FASE 1: Geolocalización automática
+  document.getElementById('r-coords').value='';
+  document.getElementById('r-lat').value='';
+  document.getElementById('r-lon').value='';
+  capturarGeoSilencioso();
+
+  document.getElementById('overlay-reg').classList.add('open');
+}
+
+function editarMedidor(id){
+  const m = medidores.find(x=>x.id===id);
+  if(!m) return;
+  editId = id;
+  fotoBase64 = m.foto || null;
+
+  document.getElementById('modal-reg-title').textContent = 'Editar medidor';
+  document.getElementById('modal-reg-icon').textContent  = '✏️';
+  document.getElementById('btn-eliminar').style.display  = 'block';
+  document.getElementById('btn-guardar').textContent     = 'Actualizar';
+
+  document.getElementById('r-subestacion').value = m.n_subestacion||'';
+  document.getElementById('r-poste').value       = m.n_poste||'';
+  document.getElementById('r-tecnico').value     = m.tecnico||'';
+  document.getElementById('r-direccion').value   = m.direccion||'';
+  document.getElementById('r-serie').value       = m.n_medidor||'';
+  document.getElementById('r-tipo').value        = m.tipo_medidor||'';
+  document.getElementById('r-tc').value          = m.tipo_tc||'';
+  document.getElementById('r-razon-tc').value    = m.razon_tc||'';
+  document.getElementById('r-estado').value      = m.estado||'Pendiente';
+  document.getElementById('r-fecha').value       = m.fecha_instalacion||'';
+  document.getElementById('r-comentario').value  = m.comentario||'';
+  document.getElementById('r-lat').value         = m.latitud||m.Coordenada_Y||'';
+  document.getElementById('r-lon').value         = m.longitud||m.Coordenada_X||'';
+
+  const hIni = m.hora_inicio||'';
+  const hFin = m.hora_fin||'';
+  document.getElementById('r-hora-inicio').value = hIni;
+  document.getElementById('display-inicio').innerHTML = hIni ? `${hIni} <small>Registrada</small>` : `— <small>Sin dato</small>`;
+  document.getElementById('r-hora-fin').value    = hFin;
+
+  if(hIni && hFin){
+    const ciclo = calcCicloMin(hIni, hFin);
+    if(ciclo!==null&&ciclo>0){
+      document.getElementById('ciclo-val').textContent = fmtMin(ciclo);
+      document.getElementById('ciclo-calc').style.display='block';
+    }
+  }
+
+  const lat = m.latitud||m.Coordenada_Y||'';
+  const lon = m.longitud||m.Coordenada_X||'';
+  if(lat&&lon) document.getElementById('r-coords').value = `${lat}, ${lon}`;
+
+  const prevEl = document.getElementById('foto-preview');
+  if(m.foto){ prevEl.src=m.foto; prevEl.style.display='block'; }
+  else       { prevEl.src=''; prevEl.style.display='none'; }
+
+  document.getElementById('overlay-reg').classList.add('open');
+}
+
+function closeRegistrar(){
+  document.getElementById('overlay-reg').classList.remove('open');
+}
+
+async function guardarMedidor(){
+  const estado = document.getElementById('r-estado').value;
+  const lat    = parseFloat(document.getElementById('r-lat').value)||null;
+  const lon    = parseFloat(document.getElementById('r-lon').value)||null;
+  const hIni   = document.getElementById('r-hora-inicio').value;
+  const hFin   = document.getElementById('r-hora-fin').value;
+
+  const obj = {
+    n_subestacion:    document.getElementById('r-subestacion').value.trim(),
+    n_poste:          document.getElementById('r-poste').value.trim(),
+    tecnico:          document.getElementById('r-tecnico').value.trim(),
+    direccion:        document.getElementById('r-direccion').value.trim(),
+    n_medidor:        document.getElementById('r-serie').value.trim(),
+    tipo_medidor:     document.getElementById('r-tipo').value,
+    tipo_tc:          document.getElementById('r-tc').value,
+    razon_tc:         document.getElementById('r-razon-tc').value.trim(),
+    estado:           estado,
+    fecha_instalacion:document.getElementById('r-fecha').value,
+    comentario:       document.getElementById('r-comentario').value.trim(),
+    latitud:          lat,
+    longitud:         lon,
+    hora_inicio:      hIni,
+    hora_fin:         hFin,
+    foto:             fotoBase64 || null,
+    sync:             false,
+    updated_at:       new Date().toISOString()
+  };
+
+  if(editId) obj.id = editId;
+  const savedId = await dbPut(obj);
+  if(!editId) obj.id = savedId;
+
+  const idx = medidores.findIndex(m=>m.id===obj.id);
+  if(idx>=0) medidores[idx]=obj; else medidores.push(obj);
+
+  closeRegistrar();
+  actualizarUI();
+  showToast(editId ? '✅ Registro actualizado' : '✅ Medidor guardado');
+}
+
+async function eliminarMedidor(){
+  if(!editId) return;
+  if(!confirm('¿Eliminar este registro?')) return;
+  await dbDelete(editId);
+  medidores = medidores.filter(m=>m.id!==editId);
+  closeRegistrar();
+  actualizarUI();
+  showToast('🗑 Registro eliminado');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CARGAR RUTA EXCEL/CSV
+// ═══════════════════════════════════════════════════════════
+function openCargar() { document.getElementById('overlay-cargar').classList.add('open'); }
+function closeCargar(){ document.getElementById('overlay-cargar').classList.remove('open'); }
+
+async function cargarRuta(input){
+  const file = input.files[0];
+  if(!file) return;
+  closeCargar();
+  showToast('⏳ Procesando archivo...');
+
+  const reader = new FileReader();
+  reader.onload = async(e)=>{
+    let rows = [];
+    const name = file.name.toLowerCase();
+    if(name.endsWith('.csv')){
+      const text = new TextDecoder('utf-8').decode(e.target.result);
+      const lines = text.trim().split('\n');
+      const headers = lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
+      rows = lines.slice(1).map(line=>{
+        const vals = line.split(',').map(v=>v.trim().replace(/"/g,''));
+        const obj = {};
+        headers.forEach((h,i)=>obj[h]=vals[i]||'');
+        return obj;
+      });
+    } else {
+      const wb = XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(ws,{defval:''});
+    }
+
+    let cnt = 0;
+    for(const r of rows){
+      const obj = {
+        n_subestacion:    String(r.n_subestacion||r.subestacion||''),
+        n_poste:          String(r.n_poste||r.poste||''),
+        tecnico:          String(r.tecnico||''),
+        direccion:        String(r.direccion||''),
+        n_medidor:        String(r.n_medidor||''),
+        Coordenada_X:     parseFloat(r.Coordenada_X||r.longitud||r.lon||0)||null,
+        Coordenada_Y:     parseFloat(r.Coordenada_Y||r.latitud||r.lat||0)||null,
+        latitud:          parseFloat(r.Coordenada_Y||r.latitud||0)||null,
+        longitud:         parseFloat(r.Coordenada_X||r.longitud||0)||null,
+        tipo_medidor:     String(r.tipo_medidor||''),
+        tipo_tc:          String(r.tipo_tc||''),
+        razon_tc:         String(r.razon_tc||''),
+        estado:           String(r.estado||'Pendiente'),
+        fecha_instalacion:String(r.fecha_instalacion||''),
+        comentario:       String(r.comentario||''),
+        hora_inicio:      String(r.hora_inicio||''),
+        hora_fin:         String(r.hora_fin||''),
+        foto:             null,
+        sync:             false,
+        updated_at:       new Date().toISOString()
+      };
+      await dbPut(obj);
+      cnt++;
+    }
+    medidores = await dbGetAll();
+    actualizarUI();
+    showToast(`✅ ${cnt} registros cargados`);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function borrarTodo(){
+  if(!confirm('¿Borrar TODOS los datos? Esta acción no se puede deshacer.')) return;
+  await dbClear();
+  medidores = [];
+  closeCargar();
+  actualizarUI();
+  showToast('🗑 Datos borrados');
+}
+
+// ═══════════════════════════════════════════════════════════
+// ▶ FASE 1: GEOLOCALIZACIÓN
+// ═══════════════════════════════════════════════════════════
+function capturarGeoSilencioso(){
+  if(!navigator.geolocation) return;
+  const st = document.getElementById('geo-status');
+  st.innerHTML='<span class="geo-ok">📡 Obteniendo ubicación...</span>';
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const lat = pos.coords.latitude.toFixed(6);
+      const lon = pos.coords.longitude.toFixed(6);
+      document.getElementById('r-lat').value   = lat;
+      document.getElementById('r-lon').value   = lon;
+      document.getElementById('r-coords').value= `${lat}, ${lon}`;
+      st.innerHTML=`<span class="geo-ok">✅ GPS: ±${Math.round(pos.coords.accuracy)}m</span>`;
+    },
+    err=>{
+      st.innerHTML='<span class="geo-err">⚠️ Sin GPS — ingrese manualmente</span>';
+    },
+    {enableHighAccuracy:true,timeout:10000,maximumAge:0}
+  );
+}
+
+function capturarGeo(){
+  if(!navigator.geolocation){
+    showToast('⚠️ GPS no disponible en este dispositivo'); return;
+  }
+  const st = document.getElementById('geo-status');
+  st.innerHTML='<span class="geo-ok">📡 Localizando...</span>';
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const lat = pos.coords.latitude.toFixed(6);
+      const lon = pos.coords.longitude.toFixed(6);
+      document.getElementById('r-lat').value   = lat;
+      document.getElementById('r-lon').value   = lon;
+      document.getElementById('r-coords').value= `${lat}, ${lon}`;
+      st.innerHTML=`<span class="geo-ok">✅ GPS capturado ±${Math.round(pos.coords.accuracy)}m</span>`;
+      showToast('📍 Ubicación capturada');
+    },
+    err=>{
+      st.innerHTML='<span class="geo-err">❌ Error GPS: '+err.message+'</span>';
+    },
+    {enableHighAccuracy:true,timeout:15000,maximumAge:0}
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// ▶ FASE 1: TIEMPOS
+// ═══════════════════════════════════════════════════════════
+function horaActual(){
+  const d = new Date();
+  return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+function capturarAhora(){
+  document.getElementById('r-hora-fin').value = horaActual();
+  actualizarCicloPreview();
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('r-hora-fin').addEventListener('change', actualizarCicloPreview);
+});
+function actualizarCicloPreview(){
+  const hIni = document.getElementById('r-hora-inicio').value;
+  const hFin = document.getElementById('r-hora-fin').value;
+  if(!hIni||!hFin) return;
+  const ciclo = calcCicloMin(hIni, hFin);
+  if(ciclo!==null&&ciclo>0&&ciclo<600){
+    document.getElementById('ciclo-val').textContent = fmtMin(ciclo);
+    document.getElementById('ciclo-calc').style.display='block';
+  }
+}
+
+// TC row toggle
+document.addEventListener('change', e=>{
+  if(e.target.id==='r-tc'){
+    const show = e.target.value && e.target.value!=='Sin TC' && e.target.value!=='';
+    document.getElementById('row-razon-tc').style.display = show?'block':'none';
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// ▶ FASE 1: FOTOGRAFÍA
+// ═══════════════════════════════════════════════════════════
+function onFotoChange(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    fotoBase64 = e.target.result;
+    const prev = document.getElementById('foto-preview');
+    prev.src = fotoBase64;
+    prev.style.display='block';
+    showToast('📷 Foto cargada');
+  };
+  reader.readAsDataURL(file);
+}
+function clearFoto(){
+  fotoBase64=null;
+  document.getElementById('r-foto').value='';
+  const prev = document.getElementById('foto-preview');
+  prev.src=''; prev.style.display='none';
+}
+
+// ═══════════════════════════════════════════════════════════
+// ▶ FASE 1: ESCANEO QR / CÓDIGO DE BARRAS
+// ═══════════════════════════════════════════════════════════
+async function openScanner(){
+  const ov = document.getElementById('scan-overlay');
+  ov.classList.add('open');
+
+  // Intentar BarcodeDetector nativo (Chrome Android)
+  if('BarcodeDetector' in window){
+    try{
+      const bd = new BarcodeDetector({formats:['code_128','code_39','ean_13','ean_8','qr_code','data_matrix']});
+      const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+      scanStream = stream;
+      const vid = document.getElementById('scan-video');
+      vid.srcObject = stream;
+      await vid.play();
+
+      const canvas = document.createElement('canvas');
+      const ctx    = canvas.getContext('2d');
+
+      scanIntervalId = setInterval(async()=>{
+        if(vid.readyState < vid.HAVE_ENOUGH_DATA) return;
+        canvas.width  = vid.videoWidth;
+        canvas.height = vid.videoHeight;
+        ctx.drawImage(vid,0,0);
+        try{
+          const codes = await bd.detect(canvas);
+          if(codes.length>0){
+            const val = codes[0].rawValue;
+            closeScanner();
+            document.getElementById('r-serie').value = val;
+            showToast('✅ Código leído: '+val);
+          }
+        }catch(e){}
+      }, 400);
+      return;
+    }catch(err){
+      console.warn('BarcodeDetector falló:',err);
+    }
+  }
+
+  // Fallback: input manual con cámara
+  closeScanner();
+  showToast('⚠️ Escaneo no soportado — ingrese manualmente');
+}
+
+function closeScanner(){
+  document.getElementById('scan-overlay').classList.remove('open');
+  if(scanIntervalId){ clearInterval(scanIntervalId); scanIntervalId=null; }
+  if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; }
+  const vid = document.getElementById('scan-video');
+  vid.srcObject=null;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SINCRONIZAR (placeholder Firebase)
+// ═══════════════════════════════════════════════════════════
+function sincronizar(){
+  showToast('ℹ️ Firebase no configurado — datos en local');
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════
+let toastTimer;
+function showToast(msg, dur=2800){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+// ═══════════════════════════════════════════════════════════
+// ARRANQUE
+// ═══════════════════════════════════════════════════════════
+init();
+</script>
+</body>
+</html>
